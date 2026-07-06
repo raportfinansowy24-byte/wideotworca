@@ -673,114 +673,6 @@ def parse_gradio_result(result):
 
     return _extract_recursive(result)
 
-def generate_hunyuan_video_segment(prompt, output_path, aspect_ratio="9:16"):
-    """Generate a video segment via Wan2.1 API and save it directly to output_path."""
-
-    logger.info(f"🎬 Wan2.1: generating video for prompt: {prompt[:60]}...")
-    logger.info("⏳ Calling Wan2.1 API /t2v_generation_async endpoint (async)...")
-
-    def _call_api():
-        try:
-            from gradio_client import Client
-            client = Client("Wan-AI/Wan2.1")
-            logger.info("Wan2.1 Endpoint URL: %s", client.src)
-
-            # Mapping aspect_ratio to size
-            size = '1280*720'
-            if aspect_ratio == "9:16":
-                size = '720*1280'
-            elif aspect_ratio == "1:1":
-                size = '960*960'
-
-            # Submit job asynchronously
-            payload = {
-                "prompt": prompt,
-                "size": size,
-                "watermark_wan": True,
-                "seed": -1,
-                "api_name": "/t2v_generation_async"
-            }
-            logger.info("Wan2.1 API Payload: %s", payload)
-
-            logger.info("Before client.submit()")
-            job = client.submit(
-                prompt=prompt,
-                size=size,
-                watermark_wan=True,
-                seed=-1,
-                api_name="/t2v_generation_async"
-            )
-            logger.info("After client.submit()")
-            
-            logger.info("✅ Job submitted. Waiting for completion using job.result()...")
-
-            # Blocking call that waits until the job is done
-            result = job.result()
-            logger.info("✅ Job finished, retrieving result...")
-            
-            # The result from job.result() is likely the same structure as what status_refresh returned
-            logger.debug("DEBUG: Job result: %r", result)
-            
-            video_path = None
-            
-            # Parsing the result (adjusting for the structure returned by result())
-            if isinstance(result, (list, tuple)):
-                for i, item in enumerate(result):
-                    logger.info("DEBUG: item[%d]: %r", i, item)
-                    if isinstance(item, dict) and "video" in item:
-                        video_path = item["video"]
-                        break
-                    elif isinstance(item, str) and (item.endswith('.mp4') or item.startswith('http')):
-                        video_path = item
-                        break
-            elif isinstance(result, dict):
-                video_path = result.get("video")
-            
-            if not video_path:
-                logger.error("No video found in result: %r", result)
-                return None
-            
-            logger.info(f"✅ Video path found: {video_path}")
-
-            # Download with retry mechanism
-            def _download_video():
-                logger.info(f"💾 Downloading video from {video_path}...")
-                response = requests.get(video_path, stream=True, timeout=60)
-                response.raise_for_status()
-                with open(output_path, "wb") as f:
-                    shutil.copyfileobj(response.raw, f)
-                logger.info(f"✅ Video saved to {output_path}")
-
-            retry_with_backoff("Download Wan2.1 video", _download_video, max_retries=3, base_delay=10)
-
-            return output_path
-        except Exception as e:
-            logger.error(f"❌ Wan2.1 API/Download error: {e}")
-            raise
-
-    video_path = retry_with_backoff("Wan2.1 Gradio", _call_api, max_retries=3, base_delay=30)
-
-    if not video_path:
-        raise RuntimeError(f"No video path found in Wan2.1 response")
-
-    # Download/Copy video
-    if video_path.startswith("http"):
-        logger.info(f"📥 Downloading video from {video_path[:80]}...")
-        response = requests.get(video_path, timeout=300)
-        response.raise_for_status()
-        with open(output_path, "wb") as f:
-            f.write(response.content)
-        logger.info(f"✅ Video saved to {output_path}")
-    else:
-        # Local file path returned by Gradio
-        import shutil
-        shutil.copy(video_path, output_path)
-        logger.info(f"✅ Video copied to {output_path}")
-
-    return output_path
-
-
-
 def generate_video_segment(prompt, aspect_ratio="9:16"):
     """Generuje pojedynczy klip wideo (Wan2.2) i zwraca lokalną ścieżkę tymczasową."""
     logger.info(f"🎬 Generowanie segmentu HunyuanVideo: {prompt[:50]}...")
@@ -1419,7 +1311,7 @@ def render_sequence_background(job_id, raw_data, webhook_url=None, resume_from=N
             story_prompt = build_story_prompt(topic, narration_for_prompt)
 
             logger.info("🎥 Generowanie głównego wideo 18s (Wan2.2)...")
-            generate_hunyuan_video_segment(story_prompt, main_video_path)
+            generate_wan_video(story_prompt, main_video_path)
 
             segment_files.append(main_video_path)
             logger.info("✅ Główne wideo 18s gotowe")
