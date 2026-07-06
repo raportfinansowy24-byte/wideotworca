@@ -15,6 +15,7 @@ import socket
 import shutil
 import subprocess
 from datetime import datetime, timedelta
+from gradio_client import Client
 from flask import Flask, request, jsonify, send_from_directory
 from PIL import Image, ImageDraw, ImageFont
 
