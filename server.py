@@ -668,18 +668,6 @@ def generate_hunyuan_video_segment(prompt, output_path, aspect_ratio="9:16"):
 
 
 
-def generate_wan_video(prompt: str, output_path: str):
-"""
-Fixed Wan2.1 Gradio API integration that properly handles async responses.
-"""
-
-import os
-import time
-import logging
-import requests
-import tempfile
-import shutil
-from gradio_client import Client
 
 logger = logging.getLogger(__name__)
 
