@@ -12,5 +12,4 @@ gradio_client>=0.15.0
 boto3>=1.34.0
 huggingface_hub>=0.23.0
 replicate>=0.25.2
-piper-tts>=1.2.0
-piper-tts
+
